@@ -1,0 +1,436 @@
+<span class="hljs-keyword">if</span> <span class="hljs-built_in">canreadfile1</span>(<span class="hljs-string">&quot;config.asm&quot;</span>,<span class="hljs-number">0</span>) != <span class="hljs-number">0</span>
+	<span class="hljs-keyword">incsrc</span> <span class="hljs-string">&quot;config.asm&quot;</span>
+<span class="hljs-keyword">endif</span>
+
+<span class="hljs-symbol">!PerLevel</span> ?= <span class="hljs-number">0</span>
+<span class="hljs-symbol">!Disable255SpritesPerLevel</span> ?= <span class="hljs-number">0</span>
+
+<span class="hljs-comment">;only works for SA-1 version 1.10+</span>
+
+<span class="hljs-symbol">!CustomBit</span>		= <span class="hljs-number">$08</span>
+
+<span class="hljs-keyword">macro</span> debugmsg(msg)
+	<span class="hljs-symbol">!__debug</span> ?= <span class="hljs-number">0</span>					<span class="hljs-comment">; set debug flag to 0 if not set already</span>
+	<span class="hljs-keyword">if</span> <span class="hljs-symbol">!__debug</span> = <span class="hljs-number">1</span>				<span class="hljs-comment">; if set...</span>
+		<span class="hljs-keyword">print</span> <span class="hljs-string">&quot;$&quot;</span>,pc,<span class="hljs-string">&quot; &lt;msg&gt;&quot;</span>	<span class="hljs-comment">; print the pc address.</span>
+	<span class="hljs-keyword">endif</span>
+<span class="hljs-keyword">endmacro</span>
+
+<span class="hljs-comment">;branch extra bit set</span>
+<span class="hljs-keyword">macro</span> BES(label)
+	<span class="hljs-keyword">LDA </span><span class="hljs-symbol">!extra_bits</span>,x
+	<span class="hljs-keyword">AND </span><span class="hljs-number">#$04</span>
+	<span class="hljs-keyword">BNE </span><span class="hljs-symbol">&lt;label&gt;</span>
+<span class="hljs-keyword">endmacro</span>
+
+<span class="hljs-comment">;branch extra bit clear</span>
+<span class="hljs-keyword">macro</span> BEC(label)
+	<span class="hljs-keyword">LDA </span><span class="hljs-symbol">!extra_bits</span>,x
+	<span class="hljs-keyword">AND </span><span class="hljs-number">#$04</span>
+	<span class="hljs-keyword">BEQ </span><span class="hljs-symbol">&lt;label&gt;</span>
+<span class="hljs-keyword">endmacro</span>
+
+<span class="hljs-comment">;Check if A is inbetween x and -x</span>
+<span class="hljs-keyword">macro</span> Between(x, label)
+	<span class="hljs-keyword">CLC </span>: <span class="hljs-keyword">ADC </span><span class="hljs-symbol">&lt;x&gt;</span>
+	<span class="hljs-keyword">CMP </span><span class="hljs-symbol">&lt;x&gt;</span>*<span class="hljs-number">2</span>
+	<span class="hljs-keyword">BCS </span><span class="hljs-symbol">&lt;label&gt;</span>
+<span class="hljs-keyword">endmacro</span>
+
+<span class="hljs-symbol">!EXLEVEL</span> = <span class="hljs-number">0</span>
+<span class="hljs-keyword">if</span> (((<span class="hljs-built_in">read1</span>(<span class="hljs-number">$0FF0B4</span>)-&#x27;<span class="hljs-number">0</span>&#x27;)*<span class="hljs-number">100</span>)+((<span class="hljs-built_in">read1</span>(<span class="hljs-number">$0FF0B4</span>+<span class="hljs-number">2</span>)-&#x27;<span class="hljs-number">0</span>&#x27;)*<span class="hljs-number">10</span>)+(<span class="hljs-built_in">read1</span>(<span class="hljs-number">$0FF0B4</span>+<span class="hljs-number">3</span>)-&#x27;<span class="hljs-number">0</span>&#x27;)) &gt; <span class="hljs-number">253</span>
+	<span class="hljs-symbol">!EXLEVEL</span> = <span class="hljs-number">1</span>
+<span class="hljs-keyword">endif</span>
+
+<span class="hljs-keyword">macro</span> invoke_snes(addr)
+	<span class="hljs-keyword">LDA.b </span>#<span class="hljs-symbol">&lt;addr&gt;</span>
+	<span class="hljs-keyword">STA </span><span class="hljs-number">$0183</span>
+	<span class="hljs-keyword">LDA.b </span>#<span class="hljs-symbol">&lt;addr&gt;</span>/<span class="hljs-number">256</span>
+	<span class="hljs-keyword">STA </span><span class="hljs-number">$0184</span>
+	<span class="hljs-keyword">LDA.b </span>#<span class="hljs-symbol">&lt;addr&gt;</span>/<span class="hljs-number">65536</span>
+	<span class="hljs-keyword">STA </span><span class="hljs-number">$0185</span>
+	<span class="hljs-keyword">LDA </span><span class="hljs-number">#$D0</span>
+	<span class="hljs-keyword">STA </span><span class="hljs-number">$2209</span>
+-	<span class="hljs-keyword">LDA </span><span class="hljs-number">$018A</span>
+	<span class="hljs-keyword">BEQ </span>-
+	<span class="hljs-keyword">STZ </span><span class="hljs-number">$018A</span>
+<span class="hljs-keyword">endmacro</span>
+
+
+<span class="hljs-keyword">if</span> <span class="hljs-built_in">read1</span>(<span class="hljs-number">$00FFD5</span>) == <span class="hljs-number">$23</span>		<span class="hljs-comment">; check if the rom is sa-1</span>
+	<span class="hljs-keyword">if</span> <span class="hljs-built_in">read1</span>(<span class="hljs-number">$00FFD7</span>) == <span class="hljs-number">$0D</span> <span class="hljs-comment">; full 6/8 mb sa-1 rom</span>
+		<span class="hljs-keyword">fullsa1rom</span>
+		<span class="hljs-symbol">!fullsa1</span> = <span class="hljs-number">1</span>
+	<span class="hljs-keyword">else</span>
+		<span class="hljs-symbol">!fullsa1</span> = <span class="hljs-number">0</span>
+		<span class="hljs-keyword">sa1rom</span>
+	<span class="hljs-keyword">endif</span>
+	<span class="hljs-symbol">!sa1</span> = <span class="hljs-number">1</span>
+	<span class="hljs-symbol">!SA1</span> = <span class="hljs-number">1</span>
+	<span class="hljs-symbol">!SA_1</span> = <span class="hljs-number">1</span>
+	<span class="hljs-symbol">!Base1</span> = <span class="hljs-number">$3000</span>
+	<span class="hljs-symbol">!Base2</span> = <span class="hljs-number">$6000</span>
+	<span class="hljs-symbol">!dp</span> = <span class="hljs-number">$3000</span>
+	<span class="hljs-symbol">!addr</span> = <span class="hljs-number">$6000</span>
+
+	<span class="hljs-symbol">!BankA</span> = <span class="hljs-number">$400000</span>
+	<span class="hljs-symbol">!BankB</span> = <span class="hljs-number">$000000</span>
+	<span class="hljs-symbol">!bank</span> = <span class="hljs-number">$000000</span>
+
+	<span class="hljs-symbol">!Bank8</span> = <span class="hljs-number">$00</span>
+	<span class="hljs-symbol">!bank8</span> = <span class="hljs-number">$00</span>
+
+	<span class="hljs-symbol">!SprSize</span> = <span class="hljs-number">$16</span>
+<span class="hljs-keyword">else</span>
+	<span class="hljs-keyword">lorom</span>
+	<span class="hljs-symbol">!sa1</span> = <span class="hljs-number">0</span>
+	<span class="hljs-symbol">!SA1</span> = <span class="hljs-number">0</span>
+	<span class="hljs-symbol">!SA_1</span> = <span class="hljs-number">0</span>
+	<span class="hljs-symbol">!Base1</span> = <span class="hljs-number">$0000</span>
+	<span class="hljs-symbol">!Base2</span> = <span class="hljs-number">$0000</span>
+	<span class="hljs-symbol">!dp</span> = <span class="hljs-number">$0000</span>
+	<span class="hljs-symbol">!addr</span> = <span class="hljs-number">$0000</span>
+
+	<span class="hljs-symbol">!BankA</span> = <span class="hljs-number">$7E0000</span>
+	<span class="hljs-symbol">!BankB</span> = <span class="hljs-number">$800000</span>
+	<span class="hljs-symbol">!bank</span> = <span class="hljs-number">$800000</span>
+
+	<span class="hljs-symbol">!Bank8</span> = <span class="hljs-number">$80</span>
+	<span class="hljs-symbol">!bank8</span> = <span class="hljs-number">$80</span>
+
+	<span class="hljs-symbol">!SprSize</span> = <span class="hljs-number">$0C</span>
+<span class="hljs-keyword">endif</span>
+
+<span class="hljs-keyword">macro</span> define_sprite_table(name, addr, addr_sa1)
+	<span class="hljs-keyword">if</span> <span class="hljs-symbol">!SA1</span> == <span class="hljs-number">0</span>
+		!<span class="hljs-symbol">&lt;name&gt;</span> = <span class="hljs-symbol">&lt;addr&gt;</span>
+	<span class="hljs-keyword">else</span>
+		!<span class="hljs-symbol">&lt;name&gt;</span> = <span class="hljs-symbol">&lt;addr_sa1&gt;</span>
+	<span class="hljs-keyword">endif</span>
+<span class="hljs-keyword">endmacro</span>
+
+<span class="hljs-keyword">macro</span> define_base2_address(name, addr)
+	<span class="hljs-keyword">if</span> <span class="hljs-symbol">!SA1</span> == <span class="hljs-number">0</span>
+		!<span class="hljs-symbol">&lt;name&gt;</span> = <span class="hljs-symbol">&lt;addr&gt;</span>
+	<span class="hljs-keyword">else</span>
+		!<span class="hljs-symbol">&lt;name&gt;</span> = <span class="hljs-symbol">&lt;addr&gt;</span>|<span class="hljs-symbol">!Base2</span>
+	<span class="hljs-keyword">endif</span>
+<span class="hljs-keyword">endmacro</span>
+
+<span class="hljs-symbol">!GenStart</span> = <span class="hljs-number">$D0</span>
+<span class="hljs-symbol">!ClusterOffset</span>  = <span class="hljs-number">$09</span>
+<span class="hljs-symbol">!ExtendedOffset</span> = <span class="hljs-number">$13</span>
+<span class="hljs-symbol">!MinorExtendedOffset</span> = <span class="hljs-number">$0C</span>
+<span class="hljs-symbol">!SmokeOffset</span> = <span class="hljs-number">$06</span>
+<span class="hljs-symbol">!SpinningCoinOffset</span> = <span class="hljs-number">$02</span>
+<span class="hljs-symbol">!BounceOffset</span> = <span class="hljs-number">$08</span>
+<span class="hljs-symbol">!ScoreOffset</span> = <span class="hljs-number">$16</span>
+<span class="hljs-comment">;!QuakeOffset = $03</span>
+
+<span class="hljs-symbol">!ClusterSize</span> = <span class="hljs-number">$14</span>
+<span class="hljs-symbol">!ExtendedSize</span> = <span class="hljs-number">$08</span>
+<span class="hljs-symbol">!MinorExtendedSize</span> = <span class="hljs-number">$0C</span>
+<span class="hljs-symbol">!SmokeSize</span> = <span class="hljs-number">$04</span>
+<span class="hljs-symbol">!SpinningCoinSize</span> = <span class="hljs-number">$04</span>
+<span class="hljs-symbol">!BounceSize</span> = <span class="hljs-number">$04</span>
+<span class="hljs-symbol">!ScoreSize</span> = <span class="hljs-number">$06</span>
+<span class="hljs-comment">;!QuakeSize = $04</span>
+
+<span class="hljs-comment">;$9E,x =  ($B4)</span>
+
+<span class="hljs-comment">;sprite tool / pixi defines</span>
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;7FAB10&quot;</span>,<span class="hljs-number">$7FAB10</span>,<span class="hljs-number">$6040</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;7FAB1C&quot;</span>,<span class="hljs-number">$7FAB1C</span>,<span class="hljs-number">$6056</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;7FAB28&quot;</span>,<span class="hljs-number">$7FAB28</span>,<span class="hljs-number">$6057</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;7FAB34&quot;</span>,<span class="hljs-number">$7FAB34</span>,<span class="hljs-number">$606D</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;7FAB9E&quot;</span>,<span class="hljs-number">$7FAB9E</span>,<span class="hljs-number">$6083</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;7FAB40&quot;</span>,<span class="hljs-number">$7FAB40</span>,<span class="hljs-number">$6099</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;7FAB4C&quot;</span>,<span class="hljs-number">$7FAB4C</span>,<span class="hljs-number">$60AF</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;7FAB58&quot;</span>,<span class="hljs-number">$7FAB58</span>,<span class="hljs-number">$60C5</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;7FAB64&quot;</span>,<span class="hljs-number">$7FAB64</span>,<span class="hljs-number">$60DB</span>)
+
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;7FAC00&quot;</span>,<span class="hljs-number">$7FAC00</span>,<span class="hljs-number">$60F1</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;7FAC08&quot;</span>,<span class="hljs-number">$7FAC08</span>,<span class="hljs-number">$6030</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;7FAC10&quot;</span>,<span class="hljs-number">$7FAC10</span>,<span class="hljs-number">$6038</span>)
+
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;extra_bits&quot;</span>,<span class="hljs-number">$7FAB10</span>,<span class="hljs-number">$6040</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;new_code_flag&quot;</span>,<span class="hljs-number">$7FAB1C</span>,<span class="hljs-number">$6056</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;extra_prop_1&quot;</span>,<span class="hljs-number">$7FAB28</span>,<span class="hljs-number">$6057</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;extra_prop_2&quot;</span>,<span class="hljs-number">$7FAB34</span>,<span class="hljs-number">$606D</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;new_sprite_num&quot;</span>,<span class="hljs-number">$7FAB9E</span>,<span class="hljs-number">$6083</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;extra_byte_1&quot;</span>,<span class="hljs-number">$7FAB40</span>,<span class="hljs-number">$6099</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;extra_byte_2&quot;</span>,<span class="hljs-number">$7FAB4C</span>,<span class="hljs-number">$60AF</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;extra_byte_3&quot;</span>,<span class="hljs-number">$7FAB58</span>,<span class="hljs-number">$60C5</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;extra_byte_4&quot;</span>,<span class="hljs-number">$7FAB64</span>,<span class="hljs-number">$60DB</span>)
+
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;shooter_extra_byte_1&quot;</span>,<span class="hljs-number">$7FAC00</span>,<span class="hljs-number">$60F1</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;shooter_extra_byte_2&quot;</span>,<span class="hljs-number">$7FAC08</span>,<span class="hljs-number">$6030</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;shooter_extra_byte_3&quot;</span>,<span class="hljs-number">$7FAC10</span>,<span class="hljs-number">$6038</span>)
+
+<span class="hljs-comment">;%define_sprite_table(shoot_misc,$7FAB64,$4000DB)</span>
+
+<span class="hljs-comment">;shooter defines</span>
+<span class="hljs-symbol">%define_base2_address</span>(shoot_num,<span class="hljs-number">$1783</span>)		<span class="hljs-comment">; shooter number -#$BC, also has the extra bit in #$40</span>
+<span class="hljs-symbol">%define_base2_address</span>(shoot_y_low,<span class="hljs-number">$178B</span>)
+<span class="hljs-symbol">%define_base2_address</span>(shoot_y_high,<span class="hljs-number">$1793</span>)
+<span class="hljs-symbol">%define_base2_address</span>(shoot_x_low,<span class="hljs-number">$179B</span>)
+<span class="hljs-symbol">%define_base2_address</span>(shoot_x_high,<span class="hljs-number">$17A3</span>)
+<span class="hljs-symbol">%define_base2_address</span>(shoot_timer,<span class="hljs-number">$17AB</span>)
+
+
+<span class="hljs-comment">;cluster defines</span>
+<span class="hljs-symbol">%define_base2_address</span>(cluster_num,<span class="hljs-number">$1892</span>)
+<span class="hljs-symbol">%define_base2_address</span>(cluster_y_low,<span class="hljs-number">$1E02</span>)
+<span class="hljs-symbol">%define_base2_address</span>(cluster_y_high,<span class="hljs-number">$1E2A</span>)
+<span class="hljs-symbol">%define_base2_address</span>(cluster_x_low,<span class="hljs-number">$1E16</span>)
+<span class="hljs-symbol">%define_base2_address</span>(cluster_x_high,<span class="hljs-number">$1E3E</span>)
+<span class="hljs-symbol">%define_base2_address</span>(cluster_misc_0f4a,<span class="hljs-number">$0F4A</span>)
+<span class="hljs-symbol">%define_base2_address</span>(cluster_misc_0f5e,<span class="hljs-number">$0F5E</span>)
+<span class="hljs-symbol">%define_base2_address</span>(cluster_misc_0f72,<span class="hljs-number">$0F72</span>)
+<span class="hljs-symbol">%define_base2_address</span>(cluster_misc_0f86,<span class="hljs-number">$0F86</span>)
+<span class="hljs-symbol">%define_base2_address</span>(cluster_misc_0f9a,<span class="hljs-number">$0F9a</span>)
+<span class="hljs-symbol">%define_base2_address</span>(cluster_misc_1e52,<span class="hljs-number">$1E52</span>)
+<span class="hljs-symbol">%define_base2_address</span>(cluster_misc_1e66,<span class="hljs-number">$1E66</span>)
+<span class="hljs-symbol">%define_base2_address</span>(cluster_misc_1e7a,<span class="hljs-number">$1E7A</span>)
+<span class="hljs-symbol">%define_base2_address</span>(cluster_misc_1e8e,<span class="hljs-number">$1E8E</span>)
+
+<span class="hljs-comment">;extended defines</span>
+<span class="hljs-symbol">%define_base2_address</span>(extended_num,<span class="hljs-number">$170B</span>)
+<span class="hljs-symbol">%define_base2_address</span>(extended_y_low,<span class="hljs-number">$1715</span>)
+<span class="hljs-symbol">%define_base2_address</span>(extended_y_high,<span class="hljs-number">$1729</span>)
+<span class="hljs-symbol">%define_base2_address</span>(extended_x_low,<span class="hljs-number">$171F</span>)
+<span class="hljs-symbol">%define_base2_address</span>(extended_x_high,<span class="hljs-number">$1733</span>)
+<span class="hljs-symbol">%define_base2_address</span>(extended_x_speed,<span class="hljs-number">$1747</span>)
+<span class="hljs-symbol">%define_base2_address</span>(extended_y_speed,<span class="hljs-number">$173D</span>)
+<span class="hljs-symbol">%define_base2_address</span>(extended_x_fraction,<span class="hljs-number">$175B</span>)
+<span class="hljs-symbol">%define_base2_address</span>(extended_y_fraction,<span class="hljs-number">$1751</span>)
+<span class="hljs-symbol">%define_base2_address</span>(extended_table,<span class="hljs-number">$1765</span>)
+<span class="hljs-symbol">%define_base2_address</span>(extended_timer,<span class="hljs-number">$176F</span>)
+<span class="hljs-symbol">%define_base2_address</span>(extended_behind,<span class="hljs-number">$1779</span>)
+
+<span class="hljs-symbol">%define_base2_address</span>(extended_table_1,<span class="hljs-number">$1765</span>)
+<span class="hljs-symbol">%define_base2_address</span>(extended_table_2,<span class="hljs-number">$198C</span>)
+<span class="hljs-symbol">%define_base2_address</span>(extended_table_3,<span class="hljs-number">$1996</span>)
+<span class="hljs-symbol">%define_base2_address</span>(extended_table_4,<span class="hljs-number">$19A0</span>)
+<span class="hljs-symbol">%define_base2_address</span>(extended_table_5,<span class="hljs-number">$19AA</span>)
+
+<span class="hljs-comment">;minor extended defines</span>
+<span class="hljs-symbol">%define_base2_address</span>(minor_extended_num,<span class="hljs-number">$17F0</span>)
+<span class="hljs-symbol">%define_base2_address</span>(minor_extended_y_low,<span class="hljs-number">$17FC</span>)
+<span class="hljs-symbol">%define_base2_address</span>(minor_extended_y_high,<span class="hljs-number">$1814</span>)
+<span class="hljs-symbol">%define_base2_address</span>(minor_extended_x_low,<span class="hljs-number">$1808</span>)
+<span class="hljs-symbol">%define_base2_address</span>(minor_extended_x_high,<span class="hljs-number">$18EA</span>)
+<span class="hljs-symbol">%define_base2_address</span>(minor_extended_x_speed,<span class="hljs-number">$182C</span>)
+<span class="hljs-symbol">%define_base2_address</span>(minor_extended_y_speed,<span class="hljs-number">$1820</span>)
+<span class="hljs-symbol">%define_base2_address</span>(minor_extended_x_fraction,<span class="hljs-number">$1844</span>)
+<span class="hljs-symbol">%define_base2_address</span>(minor_extended_y_fraction,<span class="hljs-number">$1838</span>)
+<span class="hljs-symbol">%define_base2_address</span>(minor_extended_timer,<span class="hljs-number">$1850</span>)
+
+<span class="hljs-symbol">%define_base2_address</span>(minor_extended_table_1,<span class="hljs-number">$1938</span>)
+<span class="hljs-symbol">%define_base2_address</span>(minor_extended_table_2,<span class="hljs-number">$1944</span>)
+<span class="hljs-symbol">%define_base2_address</span>(minor_extended_table_3,<span class="hljs-number">$1950</span>)
+
+<span class="hljs-comment">;smoke sprite defines</span>
+<span class="hljs-symbol">%define_base2_address</span>(smoke_num,<span class="hljs-number">$17C0</span>)
+<span class="hljs-symbol">%define_base2_address</span>(smoke_y_low,<span class="hljs-number">$17C4</span>)
+<span class="hljs-symbol">%define_base2_address</span>(smoke_x_low,<span class="hljs-number">$17C8</span>)
+<span class="hljs-symbol">%define_base2_address</span>(smoke_timer,<span class="hljs-number">$17CC</span>)
+<span class="hljs-symbol">%define_base2_address</span>(smoke_table_1,<span class="hljs-number">$195C</span>)
+<span class="hljs-symbol">%define_base2_address</span>(smoke_table_2,<span class="hljs-number">$1960</span>)
+<span class="hljs-symbol">%define_base2_address</span>(smoke_table_3,<span class="hljs-number">$1964</span>)
+<span class="hljs-symbol">%define_base2_address</span>(smoke_y_high,<span class="hljs-number">$1960</span>)
+<span class="hljs-symbol">%define_base2_address</span>(smoke_x_high,<span class="hljs-number">$1964</span>)
+
+<span class="hljs-comment">;spinning coin sprite defines</span>
+<span class="hljs-symbol">%define_base2_address</span>(spinning_coin_num,<span class="hljs-number">$17D0</span>)
+<span class="hljs-symbol">%define_base2_address</span>(spinning_coin_y_low,<span class="hljs-number">$17D4</span>)
+<span class="hljs-symbol">%define_base2_address</span>(spinning_coin_y_speed,<span class="hljs-number">$17D8</span>)
+<span class="hljs-symbol">%define_base2_address</span>(spinning_coin_y_bits,<span class="hljs-number">$17DC</span>)
+<span class="hljs-symbol">%define_base2_address</span>(spinning_coin_x_low,<span class="hljs-number">$17E0</span>)
+<span class="hljs-symbol">%define_base2_address</span>(spinning_coin_layer,<span class="hljs-number">$17E4</span>)
+<span class="hljs-symbol">%define_base2_address</span>(spinning_coin_y_high,<span class="hljs-number">$17E8</span>)
+<span class="hljs-symbol">%define_base2_address</span>(spinning_coin_x_high,<span class="hljs-number">$17EC</span>)
+
+<span class="hljs-symbol">%define_base2_address</span>(spinning_coin_table_1,<span class="hljs-number">$1974</span>)
+<span class="hljs-symbol">%define_base2_address</span>(spinning_coin_table_2,<span class="hljs-number">$1978</span>)
+<span class="hljs-symbol">%define_base2_address</span>(spinning_coin_table_3,<span class="hljs-number">$197C</span>)
+
+<span class="hljs-comment">;score sprite defines</span>
+<span class="hljs-symbol">%define_base2_address</span>(score_num,<span class="hljs-number">$16E1</span>)
+<span class="hljs-symbol">%define_base2_address</span>(score_y_low,<span class="hljs-number">$16E7</span>)
+<span class="hljs-symbol">%define_base2_address</span>(score_x_low,<span class="hljs-number">$16ED</span>)
+<span class="hljs-symbol">%define_base2_address</span>(score_x_high,<span class="hljs-number">$16F3</span>)
+<span class="hljs-symbol">%define_base2_address</span>(score_y_high,<span class="hljs-number">$16F9</span>)
+<span class="hljs-symbol">%define_base2_address</span>(score_y_speed,<span class="hljs-number">$16FF</span>)
+<span class="hljs-symbol">%define_base2_address</span>(score_layer,<span class="hljs-number">$1705</span>)
+
+<span class="hljs-symbol">%define_base2_address</span>(score_table_1,<span class="hljs-number">$1980</span>)
+<span class="hljs-symbol">%define_base2_address</span>(score_table_2,<span class="hljs-number">$1986</span>)
+
+<span class="hljs-comment">;bounce sprite defines</span>
+<span class="hljs-symbol">%define_base2_address</span>(bounce_num,<span class="hljs-number">$1699</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_init,<span class="hljs-number">$169D</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_y_low,<span class="hljs-number">$16A1</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_x_low,<span class="hljs-number">$16A5</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_y_high,<span class="hljs-number">$16A9</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_x_high,<span class="hljs-number">$16AD</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_y_speed,<span class="hljs-number">$16B1</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_x_speed,<span class="hljs-number">$16B5</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_x_bits,<span class="hljs-number">$16B9</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_y_bits,<span class="hljs-number">$16BD</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_map16_tile,<span class="hljs-number">$16C1</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_timer,<span class="hljs-number">$16C5</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_table,<span class="hljs-number">$16C9</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_table_1,<span class="hljs-number">$16C9</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_properties,<span class="hljs-number">$1901</span>)
+
+<span class="hljs-symbol">%define_base2_address</span>(bounce_table_2,<span class="hljs-number">$1968</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_table_3,<span class="hljs-number">$196C</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_table_4,<span class="hljs-number">$1970</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_map16_low,<span class="hljs-number">$16C1</span>)
+<span class="hljs-symbol">%define_base2_address</span>(bounce_map16_high,<span class="hljs-number">$1968</span>)
+
+<span class="hljs-comment">;quake sprite defines</span>
+<span class="hljs-comment">; %define_base2_address(quake_num,$16CD)</span>
+<span class="hljs-comment">; %define_base2_address(quake_x_low,$16D1)</span>
+<span class="hljs-comment">; %define_base2_address(quake_x_high,$16D5)</span>
+<span class="hljs-comment">; %define_base2_address(quake_y_low,$16D9)</span>
+<span class="hljs-comment">; %define_base2_address(quake_y_high,$16DD)</span>
+<span class="hljs-comment">; %define_base2_address(quake_timer,$18F8)</span>
+
+<span class="hljs-comment">;overworld defines</span>
+<span class="hljs-comment">; %define_sprite_table(ow_num,     $0DE5, $3200)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_x_pos,     $9E, $3230)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_y_pos,     $9E, $3260)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_z_pos,     $9E, $3290)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_x_speed, $0E95, $32C0)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_y_speed, $0EA5, $32F0)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_z_speed, $0EB5, $3320)</span>
+
+<span class="hljs-comment">; %define_sprite_table(ow_misc1,   $0DF5, $3350)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_misc2,   $0E05, $3380)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_misc3,     $9E, $33B0)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_misc4,     $9E, $33E0)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_misc5,     $9E, $3410)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_timer1,  $0E15, $3440)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_timer2,  $0E25, $3470)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_timer3,    $9E, $34A0)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_extra,     $9E, $34D0)</span>
+
+<span class="hljs-comment">; %define_sprite_table(ow_x_speed_acc, $9E, $3500)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_y_speed_acc, $9E, $3500)</span>
+<span class="hljs-comment">; %define_sprite_table(ow_z_speed_acc, $9E, $3500)</span>
+
+<span class="hljs-comment">;normal sprite defines</span>
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_num, <span class="hljs-number">$9E</span>, <span class="hljs-number">$3200</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_speed_y, <span class="hljs-number">$AA</span>, <span class="hljs-number">$9E</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_speed_x, <span class="hljs-number">$B6</span>, <span class="hljs-number">$B6</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_c2, <span class="hljs-number">$C2</span>, <span class="hljs-number">$D8</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_y_low, <span class="hljs-number">$D8</span>, <span class="hljs-number">$3216</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_x_low, <span class="hljs-number">$E4</span>, <span class="hljs-number">$322C</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_status, <span class="hljs-number">$14C8</span>, <span class="hljs-number">$3242</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_y_high, <span class="hljs-number">$14D4</span>, <span class="hljs-number">$3258</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_x_high, <span class="hljs-number">$14E0</span>, <span class="hljs-number">$326E</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_speed_y_frac, <span class="hljs-number">$14EC</span>, <span class="hljs-number">$74C8</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_speed_x_frac, <span class="hljs-number">$14F8</span>, <span class="hljs-number">$74DE</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_1504, <span class="hljs-number">$1504</span>, <span class="hljs-number">$74F4</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_1510, <span class="hljs-number">$1510</span>, <span class="hljs-number">$750A</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_151c, <span class="hljs-number">$151C</span>, <span class="hljs-number">$3284</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_1528, <span class="hljs-number">$1528</span>, <span class="hljs-number">$329A</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_1534, <span class="hljs-number">$1534</span>, <span class="hljs-number">$32B0</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_1540, <span class="hljs-number">$1540</span>, <span class="hljs-number">$32C6</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_154c, <span class="hljs-number">$154C</span>, <span class="hljs-number">$32DC</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_1558, <span class="hljs-number">$1558</span>, <span class="hljs-number">$32F2</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_1564, <span class="hljs-number">$1564</span>, <span class="hljs-number">$3308</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_1570, <span class="hljs-number">$1570</span>, <span class="hljs-number">$331E</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_157c, <span class="hljs-number">$157C</span>, <span class="hljs-number">$3334</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_blocked_status, <span class="hljs-number">$1588</span>, <span class="hljs-number">$334A</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_1594, <span class="hljs-number">$1594</span>, <span class="hljs-number">$3360</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_off_screen_horz, <span class="hljs-number">$15A0</span>, <span class="hljs-number">$3376</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_15ac, <span class="hljs-number">$15AC</span>, <span class="hljs-number">$338C</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_slope, <span class="hljs-number">$15B8</span>, <span class="hljs-number">$7520</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_off_screen, <span class="hljs-number">$15C4</span>, <span class="hljs-number">$7536</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_being_eaten, <span class="hljs-number">$15D0</span>, <span class="hljs-number">$754C</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_obj_interact, <span class="hljs-number">$15DC</span>, <span class="hljs-number">$7562</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_oam_index, <span class="hljs-number">$15EA</span>, <span class="hljs-number">$33A2</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_oam_properties, <span class="hljs-number">$15F6</span>, <span class="hljs-number">$33B8</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_1602, <span class="hljs-number">$1602</span>, <span class="hljs-number">$33CE</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_160e, <span class="hljs-number">$160E</span>, <span class="hljs-number">$33E4</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_index_in_level, <span class="hljs-number">$161A</span>, <span class="hljs-number">$7578</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_1626, <span class="hljs-number">$1626</span>, <span class="hljs-number">$758E</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_behind_scenery, <span class="hljs-number">$1632</span>, <span class="hljs-number">$75A4</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_163e, <span class="hljs-number">$163E</span>, <span class="hljs-number">$33FA</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_in_water, <span class="hljs-number">$164A</span>, <span class="hljs-number">$75BA</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_tweaker_1656, <span class="hljs-number">$1656</span>, <span class="hljs-number">$75D0</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_tweaker_1662, <span class="hljs-number">$1662</span>, <span class="hljs-number">$75EA</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_tweaker_166e, <span class="hljs-number">$166E</span>, <span class="hljs-number">$7600</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_tweaker_167a, <span class="hljs-number">$167A</span>, <span class="hljs-number">$7616</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_tweaker_1686, <span class="hljs-number">$1686</span>, <span class="hljs-number">$762C</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_off_screen_vert, <span class="hljs-number">$186C</span>, <span class="hljs-number">$7642</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_187b, <span class="hljs-number">$187B</span>, <span class="hljs-number">$3410</span>)
+
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_load_table, <span class="hljs-number">$7FAF00</span>, <span class="hljs-number">$418A00</span>)
+
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_tweaker_190f, <span class="hljs-number">$190F</span>, <span class="hljs-number">$7658</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_misc_1fd6, <span class="hljs-number">$1FD6</span>, <span class="hljs-number">$766E</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(sprite_cape_disable_time, <span class="hljs-number">$1FE2</span>, <span class="hljs-number">$7FD6</span>)
+
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;9E&quot;</span>, <span class="hljs-number">$9E</span>, <span class="hljs-number">$3200</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;AA&quot;</span>, <span class="hljs-number">$AA</span>, <span class="hljs-number">$9E</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;B6&quot;</span>, <span class="hljs-number">$B6</span>, <span class="hljs-number">$B6</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;C2&quot;</span>, <span class="hljs-number">$C2</span>, <span class="hljs-number">$D8</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;D8&quot;</span>, <span class="hljs-number">$D8</span>, <span class="hljs-number">$3216</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;E4&quot;</span>, <span class="hljs-number">$E4</span>, <span class="hljs-number">$322C</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;14C8&quot;</span>, <span class="hljs-number">$14C8</span>, <span class="hljs-number">$3242</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;14D4&quot;</span>, <span class="hljs-number">$14D4</span>, <span class="hljs-number">$3258</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;14E0&quot;</span>, <span class="hljs-number">$14E0</span>, <span class="hljs-number">$326E</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;14EC&quot;</span>, <span class="hljs-number">$14EC</span>, <span class="hljs-number">$74C8</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;14F8&quot;</span>, <span class="hljs-number">$14F8</span>, <span class="hljs-number">$74DE</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1504&quot;</span>, <span class="hljs-number">$1504</span>, <span class="hljs-number">$74F4</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1510&quot;</span>, <span class="hljs-number">$1510</span>, <span class="hljs-number">$750A</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;151C&quot;</span>, <span class="hljs-number">$151C</span>, <span class="hljs-number">$3284</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1528&quot;</span>, <span class="hljs-number">$1528</span>, <span class="hljs-number">$329A</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1534&quot;</span>, <span class="hljs-number">$1534</span>, <span class="hljs-number">$32B0</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1540&quot;</span>, <span class="hljs-number">$1540</span>, <span class="hljs-number">$32C6</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;154C&quot;</span>, <span class="hljs-number">$154C</span>, <span class="hljs-number">$32DC</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1558&quot;</span>, <span class="hljs-number">$1558</span>, <span class="hljs-number">$32F2</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1564&quot;</span>, <span class="hljs-number">$1564</span>, <span class="hljs-number">$3308</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1570&quot;</span>, <span class="hljs-number">$1570</span>, <span class="hljs-number">$331E</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;157C&quot;</span>, <span class="hljs-number">$157C</span>, <span class="hljs-number">$3334</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1588&quot;</span>, <span class="hljs-number">$1588</span>, <span class="hljs-number">$334A</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1594&quot;</span>, <span class="hljs-number">$1594</span>, <span class="hljs-number">$3360</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;15A0&quot;</span>, <span class="hljs-number">$15A0</span>, <span class="hljs-number">$3376</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;15AC&quot;</span>, <span class="hljs-number">$15AC</span>, <span class="hljs-number">$338C</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;15B8&quot;</span>, <span class="hljs-number">$15B8</span>, <span class="hljs-number">$7520</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;15C4&quot;</span>, <span class="hljs-number">$15C4</span>, <span class="hljs-number">$7536</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;15D0&quot;</span>, <span class="hljs-number">$15D0</span>, <span class="hljs-number">$754C</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;15DC&quot;</span>, <span class="hljs-number">$15DC</span>, <span class="hljs-number">$7562</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;15EA&quot;</span>, <span class="hljs-number">$15EA</span>, <span class="hljs-number">$33A2</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;15F6&quot;</span>, <span class="hljs-number">$15F6</span>, <span class="hljs-number">$33B8</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1602&quot;</span>, <span class="hljs-number">$1602</span>, <span class="hljs-number">$33CE</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;160E&quot;</span>, <span class="hljs-number">$160E</span>, <span class="hljs-number">$33E4</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;161A&quot;</span>, <span class="hljs-number">$161A</span>, <span class="hljs-number">$7578</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1626&quot;</span>, <span class="hljs-number">$1626</span>, <span class="hljs-number">$758E</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1632&quot;</span>, <span class="hljs-number">$1632</span>, <span class="hljs-number">$75A4</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;163E&quot;</span>, <span class="hljs-number">$163E</span>, <span class="hljs-number">$33FA</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;164A&quot;</span>, <span class="hljs-number">$164A</span>, <span class="hljs-number">$75BA</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1656&quot;</span>, <span class="hljs-number">$1656</span>, <span class="hljs-number">$75D0</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1662&quot;</span>, <span class="hljs-number">$1662</span>, <span class="hljs-number">$75EA</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;166E&quot;</span>, <span class="hljs-number">$166E</span>, <span class="hljs-number">$7600</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;167A&quot;</span>, <span class="hljs-number">$167A</span>, <span class="hljs-number">$7616</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1686&quot;</span>, <span class="hljs-number">$1686</span>, <span class="hljs-number">$762C</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;186C&quot;</span>, <span class="hljs-number">$186C</span>, <span class="hljs-number">$7642</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;187B&quot;</span>, <span class="hljs-number">$187B</span>, <span class="hljs-number">$3410</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;190F&quot;</span>, <span class="hljs-number">$190F</span>, <span class="hljs-number">$7658</span>)
+
+<span class="hljs-keyword">if</span> <span class="hljs-symbol">!Disable255SpritesPerLevel</span>
+	<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1938&quot;</span>, <span class="hljs-number">$1938</span>, <span class="hljs-number">$418A00</span>)
+	<span class="hljs-symbol">%define_sprite_table</span>(sprite_load_table, <span class="hljs-number">$1938</span>, <span class="hljs-number">$418A00</span>)
+<span class="hljs-keyword">else</span>
+	<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1938&quot;</span>, <span class="hljs-number">$7FAF00</span>, <span class="hljs-number">$418A00</span>)
+	<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;7FAF00&quot;</span>, <span class="hljs-number">$7FAF00</span>, <span class="hljs-number">$418A00</span>)
+	<span class="hljs-symbol">%define_sprite_table</span>(sprite_load_table, <span class="hljs-number">$7FAF00</span>, <span class="hljs-number">$418A00</span>)
+<span class="hljs-keyword">endif</span>
+
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1FD6&quot;</span>, <span class="hljs-number">$1FD6</span>, <span class="hljs-number">$766E</span>)
+<span class="hljs-symbol">%define_sprite_table</span>(<span class="hljs-string">&quot;1FE2&quot;</span>, <span class="hljs-number">$1FE2</span>, <span class="hljs-number">$7FD6</span>)
