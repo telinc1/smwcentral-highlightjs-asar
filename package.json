@@ -1,0 +1,22 @@
+{
+  "name": "@smwcentral/highlightjs-asar",
+  "version": "1.0.0",
+  "description": "highlight.js syntax definitions for Asar and 65c816 ASM",
+  "main": "src/languages/asar.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/telinc1/smwcentral-highlightjs-asar"
+  },
+  "keywords": [
+    "highlight.js",
+    "highlightjs",
+    "syntax",
+    "asar",
+    "asm"
+  ],
+  "author": "Telinc1",
+  "license": "MIT"
+}
